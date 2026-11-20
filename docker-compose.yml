@@ -1,0 +1,13 @@
+services:
+  cardcatalog:
+    build: .
+    container_name: cardcatalog
+    restart: unless-stopped
+    # Bound to localhost only. Tailscale reaches it via the host's tailnet IP;
+    # change to "8000:8000" if you want it on your LAN as well.
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      - CARDCATALOG_DATA=/data

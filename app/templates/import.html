@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% set nav = "import" %}
+{% block title %}Import &middot; CardCatalog{% endblock %}
+{% block body %}
+<h1>Import from a spreadsheet</h1>
+
+{% if stage == 'upload' %}
+  {% if request.query_params.get('error') == 'expired' %}
+    <div class="note warn">That import sat too long and was cleared. Upload the file again.</div>
+  {% elif request.query_params.get('error') == 'parse' %}
+    <div class="note warn">Couldn&rsquo;t read that as a CSV. Check it has a header row.</div>
+  {% elif request.query_params.get('error') %}
+    <div class="note warn">Something went wrong with that upload. Try again.</div>
+  {% endif %}
+
+  <p class="muted">
+    Export your Google Sheet as CSV (<em>File &rarr; Download &rarr;
+    Comma-separated values</em>) and drop it here. The columns get matched up
+    automatically and you confirm the mapping before anything is written.
+  </p>
+  <form class="section" method="post" action="/import/preview" enctype="multipart/form-data">
+    <label class="drop" for="csv-input">
+      <strong>Choose a CSV file</strong>
+      <div class="small">Nothing is saved until you confirm the column mapping</div>
+    </label>
+    <input id="csv-input" type="file" name="csv_file" accept=".csv,text/csv,text/plain" required
+           style="margin-top:.75rem">
+    <div class="actions"><button class="btn btn-primary" type="submit">Read the file</button></div>
+  </form>
+
+  <div class="section">
+    <h2>How rows are read</h2>
+    <ul class="muted" style="margin:0;padding-left:1.1rem">
+      <li>Rows that name the same artist collapse into one artist with several
+        wishlist items &mdash; that&rsquo;s the thing a flat sheet can&rsquo;t do.</li>
+      <li>An artist already in the library is matched by name and added to, not duplicated.</li>
+      <li>Tags split on commas, semicolons, slashes and pipes.</li>
+      <li>Prices are stripped of currency symbols. <span class="mono">bought</span>,
+        <span class="mono">sold out</span>, <span class="mono">passed</span> and
+        similar words in a status column are recognised.</li>
+      <li>A link with no item attached becomes one of the artist&rsquo;s links.</li>
+    </ul>
+  </div>
+
+{% elif stage == 'map' %}
+  <p class="muted">
+    <strong>{{ filename }}</strong> &mdash; {{ row_count }} data
+    row{{ '' if row_count == 1 else 's' }}. Here&rsquo;s the mapping I guessed; change
+    anything that&rsquo;s wrong. Set a column to <em>Ignore</em> to leave it out.
+  </p>
+
+  <div class="note">
+    A dry run of this mapping would create
+    <strong>{{ summary.artists_created }}</strong> artist{{ '' if summary.artists_created == 1 else 's' }},
+    merge <strong>{{ summary.artists_merged }}</strong> into existing ones, and add
+    <strong>{{ summary.items_created }}</strong> wishlist item{{ '' if summary.items_created == 1 else 's' }}
+    and <strong>{{ summary.links_created }}</strong> link{{ '' if summary.links_created == 1 else 's' }}.
+    {% if summary.items_duplicate %}
+      <strong>{{ summary.items_duplicate }}</strong> item{{ '' if summary.items_duplicate == 1 else 's' }}
+      already in the library would be left alone.
+    {% endif %}
+    {% if summary.rows_skipped %}
+      {{ summary.rows_skipped }} row{{ '' if summary.rows_skipped == 1 else 's' }} would be
+      skipped ({{ summary.skipped_detail|join('; ') }}).
+    {% endif %}
+    Nothing has been written yet.
+  </div>
+
+  <form method="post" action="/import/commit">
+    <input type="hidden" name="token" value="{{ token }}">
+    <div class="section">
+      <h2>Column mapping</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Your column</th><th>Maps to</th><th>First values</th></tr></thead>
+          <tbody>
+          {% for idx in range(headers|length) %}
+            <tr>
+              <td><strong>{{ headers[idx] or '(no header)' }}</strong></td>
+              <td>
+                <select name="col_{{ idx }}" aria-label="Field for column {{ headers[idx] }}">
+                  <option value="">&mdash; Ignore &mdash;</option>
+                  {% for f in fields %}
+                    <option value="{{ f }}" {{ 'selected' if mapping.get(idx) == f }}>
+                      {{ field_labels[f] }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td class="muted" style="font-size:.84rem">
+                {% for r in rows[:3] %}
+                  {% if idx < r|length and r[idx] %}{{ r[idx][:40] }}{% if not loop.last %} &middot; {% endif %}{% endif %}
+                {% endfor %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Preview of the file</h2>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+          <tbody>
+          {% for r in rows %}
+            <tr>{% for idx in range(headers|length) %}
+              <td>{{ r[idx][:60] if idx < r|length else '' }}</td>
+            {% endfor %}</tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if row_count > rows|length %}
+        <p class="muted" style="margin-bottom:0">
+          Showing {{ rows|length }} of {{ row_count }} rows.
+        </p>
+      {% endif %}
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Import {{ row_count }} rows</button>
+      <a class="btn" href="/import">Start over</a>
+    </div>
+  </form>
+
+{% elif stage == 'done' %}
+  <div class="section">
+    <h2>Imported</h2>
+    <ul style="margin:0 0 .5rem;padding-left:1.1rem">
+      <li><strong>{{ summary.artists_created }}</strong> new artist{{ '' if summary.artists_created == 1 else 's' }}</li>
+      <li><strong>{{ summary.artists_merged }}</strong> matched an artist already in the library</li>
+      <li><strong>{{ summary.items_created }}</strong> wishlist item{{ '' if summary.items_created == 1 else 's' }}</li>
+      {% if summary.items_duplicate %}
+        <li><strong>{{ summary.items_duplicate }}</strong> item{{ '' if summary.items_duplicate == 1 else 's' }}
+          skipped as already present</li>
+      {% endif %}
+      <li><strong>{{ summary.links_created }}</strong> artist link{{ '' if summary.links_created == 1 else 's' }}</li>
+      {% if summary.rows_skipped %}
+        <li><strong>{{ summary.rows_skipped }}</strong> row{{ '' if summary.rows_skipped == 1 else 's' }}
+          skipped ({{ summary.skipped_detail|join('; ') }})</li>
+      {% endif %}
+    </ul>
+    {% if summary.tags_seen %}
+      <p class="muted" style="margin:.75rem 0 .3rem">Tags picked up:</p>
+      <div class="chips">
+        {% for t in summary.tags_seen %}<a class="chip" href="/?tag={{ t|urlencode }}">{{ t }}</a>{% endfor %}
+      </div>
+    {% endif %}
+    <div class="actions">
+      <a class="btn btn-primary" href="/">Open the library</a>
+      <a class="btn" href="/import">Import another file</a>
+    </div>
+  </div>
+  <div class="note">
+    Next step worth doing: photograph the cards. The library view is built around
+    the card images, and OCR fills the gaps your sheet didn&rsquo;t have.
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% set nav = "library" %}
+{% block title %}{{ a.name }} &middot; CardCatalog{% endblock %}
+{% block body %}
+
+<div class="crumb"><a href="/">Library</a> / {{ a.name }}</div>
+<div class="page-head">
+  <div>
+    <h1>{{ a.name }}</h1>
+    <p class="muted" style="margin:.2rem 0 0">
+      {% if a.handle %}@{{ a.handle }}{% endif %}
+      {% if a.handle and a.shop_name %} &middot; {% endif %}
+      {{ a.shop_name }}
+      {% if a.met_at %}{% if a.handle or a.shop_name %} &middot; {% endif %}met at {{ a.met_at }}{% if a.booth %}, booth {{ a.booth }}{% endif %}{% endif %}
+      {% if a.met_on %} ({{ a.met_on }}){% endif %}
+    </p>
+  </div>
+  <a class="btn" href="/artists/{{ a.id }}/edit">Edit</a>
+</div>
+
+<div class="row" style="margin-bottom:1rem">
+  <span class="pri pri-{{ a.interest }}">{{ interest_labels.get(a.interest, '') }}</span>
+  {% for t in tags %}<a class="chip" href="/?tag={{ t|urlencode }}">{{ t }}</a>{% endfor %}
+</div>
+
+{% if links %}
+<div class="section">
+  <h2>Links</h2>
+  <div class="chips">
+    {% for l in links %}
+      <a class="chip" href="{{ l.url }}" target="_blank" rel="noopener noreferrer">
+        {{ l.label or l.url }} &#8599;
+      </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if a.card_front or a.card_back %}
+<div class="section">
+  <h2>The card</h2>
+  <div class="card-images">
+    {% if a.card_front %}<img src="/uploads/{{ a.card_front }}" alt="Front of {{ a.name }}'s business card">{% endif %}
+    {% if a.card_back %}<img src="/uploads/{{ a.card_back }}" alt="Back of {{ a.name }}'s business card">{% endif %}
+  </div>
+  {% if a.ocr_text %}
+  <details class="raw" style="margin-top:.75rem">
+    <summary>Text read off the card</summary>
+    <pre>{{ a.ocr_text }}</pre>
+  </details>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if a.notes %}
+<div class="section">
+  <h2>Notes</h2>
+  <p style="white-space:pre-wrap;margin:0">{{ a.notes }}</p>
+</div>
+{% endif %}
+
+<div class="section">
+  <h2>Wish list
+    {% if open_total %}<span class="muted" style="font-weight:400;font-size:.9rem">
+      &mdash; ${{ '%.2f'|format(open_total) }} open</span>{% endif %}
+  </h2>
+
+  {% if items %}
+  <div class="table-scroll">
+    <table>
+      <thead><tr>
+        <th>Item</th><th>Priority</th><th class="num">Price</th>
+        <th>Status</th><th>For</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for i in items %}
+        <tr>
+          <td>
+            {% if i.url %}
+              <a href="{{ i.url }}" target="_blank" rel="noopener noreferrer">{{ i.title }} &#8599;</a>
+            {% else %}{{ i.title }}{% endif %}
+            {% if i.notes %}<div class="card-sub">{{ i.notes }}</div>{% endif %}
+          </td>
+          <td><span class="pri pri-{{ i.priority }}">{{ priority_labels.get(i.priority, '') }}</span></td>
+          <td class="num">{{ '$%.2f'|format(i.price) if i.price is not none else '&mdash;'|safe }}</td>
+          <td><span class="status status-{{ i.status }}">{{ status_labels.get(i.status, i.status) }}</span></td>
+          <td class="muted">{{ i.target_con }}</td>
+          <td>
+            <form class="inline-form" method="post" action="/items/{{ i.id }}/status">
+              <input type="hidden" name="back" value="/artists/{{ a.id }}">
+              <select name="status" aria-label="Change status of {{ i.title }}"
+                      onchange="this.form.submit()">
+                {% for s in statuses %}
+                  <option value="{{ s }}" {{ 'selected' if i.status == s }}>{{ status_labels[s] }}</option>
+                {% endfor %}
+              </select>
+            </form>
+            <form class="inline-form" method="post" action="/items/{{ i.id }}/delete"
+                  onsubmit="return confirm('Remove &quot;{{ i.title }}&quot; from the wish list?')">
+              <input type="hidden" name="back" value="/artists/{{ a.id }}">
+              <button class="btn btn-sm btn-danger" type="submit">Remove</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="muted">Nothing on the list for {{ a.name }} yet.</p>
+  {% endif %}
+
+  <h3 style="margin-top:1.2rem">Add an item</h3>
+  <form method="post" action="/artists/{{ a.id }}/items">
+    <div class="form-grid">
+      <div class="field">
+        <label for="i-title">What is it</label>
+        <input id="i-title" type="text" name="title" required
+               placeholder="A5 print &ndash; moonlit shrine">
+      </div>
+      <div class="field">
+        <label for="i-url">Direct link</label>
+        <input id="i-url" type="text" name="url" placeholder="https://...">
+      </div>
+      <div class="field">
+        <label for="i-price">Price</label>
+        <input id="i-price" type="text" name="price" inputmode="decimal" placeholder="25">
+      </div>
+      <div class="field">
+        <label for="i-priority">Priority</label>
+        <select id="i-priority" name="priority">
+          {% for level, label in priority_labels.items() %}
+            <option value="{{ level }}" {{ 'selected' if level == 2 }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label for="i-con">Buy at</label>
+        <input id="i-con" type="text" name="target_con" placeholder="Anime Expo 2027">
+      </div>
+      <div class="field">
+        <label for="i-status">Status</label>
+        <select id="i-status" name="status">
+          {% for s in statuses %}<option value="{{ s }}">{{ status_labels[s] }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-top:1rem">
+      <label for="i-notes">Notes</label>
+      <input id="i-notes" type="text" name="notes" placeholder="Ask about the matte version">
+    </div>
+    <div class="actions"><button class="btn btn-primary" type="submit">Add to wish list</button></div>
+  </form>
+</div>
+
+<form method="post" action="/artists/{{ a.id }}/delete"
+      onsubmit="return confirm('Delete {{ a.name }} and everything on their wish list? This cannot be undone.')">
+  <button class="btn btn-danger" type="submit">Delete this artist</button>
+</form>
+{% endblock %}

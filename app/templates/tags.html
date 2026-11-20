@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% set nav = "tags" %}
+{% block title %}Tags &middot; CardCatalog{% endblock %}
+{% block body %}
+<h1>Tags</h1>
+<p class="muted">
+  Rename a tag to fix a typo everywhere at once. Renaming onto a tag that already
+  exists merges the two.
+</p>
+
+{% if not tags %}
+  <div class="empty">
+    <h2>No tags yet</h2>
+    <p>Tags appear here once you add them to an artist.</p>
+  </div>
+{% else %}
+<div class="panel table-scroll">
+  <table>
+    <thead><tr><th>Tag</th><th class="num">Artists</th><th>Rename</th><th></th></tr></thead>
+    <tbody>
+    {% for t in tags %}
+      <tr>
+        <td><a href="/?tag={{ t.name|urlencode }}">{{ t.name }}</a></td>
+        <td class="num">{{ t.n }}</td>
+        <td>
+          <form class="row" method="post" action="/tags/{{ t.id }}/rename">
+            <input type="text" name="name" value="{{ t.name }}"
+                   aria-label="New name for {{ t.name }}">
+            <button class="btn btn-sm" type="submit">Save</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" action="/tags/{{ t.id }}/delete"
+                onsubmit="return confirm('Delete the tag &quot;{{ t.name }}&quot;? The artists stay, they just lose this tag.')">
+            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

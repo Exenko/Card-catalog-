@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% set nav = "wishlist" %}
+{% block title %}Wish list &middot; CardCatalog{% endblock %}
+{% block body %}
+
+<div class="page-head">
+  <div><h1>Wish list</h1></div>
+  <a class="btn" href="/export">Export &amp; share</a>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="n">{{ items|length }}</div><div class="k">Items shown</div></div>
+  <div class="stat"><div class="n">${{ '%.0f'|format(total) }}</div><div class="k">Total</div></div>
+  {% if unpriced %}
+    <div class="stat"><div class="n">{{ unpriced }}</div><div class="k">No price yet</div></div>
+  {% endif %}
+</div>
+
+<form class="filters" method="get" action="/wishlist">
+  <select name="status" aria-label="Filter by status">
+    <option value="want" {{ 'selected' if status == 'want' }}>Still want</option>
+    {% for s in statuses %}
+      {% if s != 'want' %}
+      <option value="{{ s }}" {{ 'selected' if status == s }}>{{ status_labels[s] }}</option>
+      {% endif %}
+    {% endfor %}
+    <option value="all" {{ 'selected' if status == 'all' }}>Everything</option>
+  </select>
+  <select name="sort" aria-label="Sort order">
+    <option value="priority"   {{ 'selected' if sort == 'priority' }}>Priority first</option>
+    <option value="price_desc" {{ 'selected' if sort == 'price_desc' }}>Most expensive</option>
+    <option value="price_asc"  {{ 'selected' if sort == 'price_asc' }}>Cheapest</option>
+    <option value="artist"     {{ 'selected' if sort == 'artist' }}>By artist</option>
+  </select>
+  {% if cons %}
+  <select name="con" aria-label="Filter by target convention">
+    <option value="">Any convention</option>
+    {% for c in cons %}<option value="{{ c }}" {{ 'selected' if con == c }}>{{ c }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  <label class="row" style="gap:.35rem">
+    <span class="muted" style="font-size:.85rem">Budget&nbsp;$</span>
+    <input type="text" id="budget-input" name="budget" inputmode="decimal"
+           value="{{ '%.0f'|format(budget) if budget else '' }}" placeholder="150"
+           style="width:84px" aria-label="Budget in dollars">
+  </label>
+  <button class="btn" type="submit">Apply</button>
+</form>
+
+{% if budget %}
+  {% set pct = (total / budget * 100) if budget else 0 %}
+  <div class="meter-wrap">
+    <div class="meter-head">
+      <span>Against a <strong>${{ '%.0f'|format(budget) }}</strong> budget</span>
+      <span><strong>${{ '%.0f'|format(total) }}</strong> on the list</span>
+    </div>
+    <div class="meter {{ 'over' if total > budget }}">
+      <span style="width:{{ [pct, 100]|min }}%"></span>
+    </div>
+    <div class="meter-note">
+      {% if total > budget %}
+        Over by ${{ '%.0f'|format(total - budget) }}. Demote some items to
+        &ldquo;Someday&rdquo; or mark them passed &mdash; sorting by priority shows
+        what to cut first.
+      {% else %}
+        ${{ '%.0f'|format(budget - total) }} left to spend.
+      {% endif %}
+      {% if unpriced %}
+        {{ unpriced }} item{{ '' if unpriced == 1 else 's' }} ha{{ 's' if unpriced == 1 else 've' }}
+        no price, so the real total is higher.
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
+{% if not items %}
+  <div class="empty">
+    <h2>Nothing here</h2>
+    <p>Open an artist and add the pieces you&rsquo;re after.</p>
+    <a class="btn" href="/">Browse the library</a>
+  </div>
+{% else %}
+<div class="panel table-scroll">
+  <table>
+    <thead><tr>
+      <th>Priority</th><th>Item</th><th>Artist</th><th class="num">Price</th>
+      <th>Status</th><th>Buy at</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for i in items %}
+      <tr>
+        <td><span class="pri pri-{{ i.priority }}">{{ priority_labels.get(i.priority, '') }}</span></td>
+        <td>
+          {% if i.url %}
+            <a href="{{ i.url }}" target="_blank" rel="noopener noreferrer">{{ i.title }} &#8599;</a>
+          {% else %}{{ i.title }}{% endif %}
+          {% if i.notes %}<div class="card-sub">{{ i.notes }}</div>{% endif %}
+        </td>
+        <td><a href="/artists/{{ i.artist_id }}">{{ i.artist }}</a></td>
+        <td class="num">{{ '$%.2f'|format(i.price) if i.price is not none else '&mdash;'|safe }}</td>
+        <td><span class="status status-{{ i.status }}">{{ status_labels.get(i.status, i.status) }}</span></td>
+        <td class="muted">{{ i.target_con }}</td>
+        <td>
+          <form class="inline-form" method="post" action="/items/{{ i.id }}/status">
+            <input type="hidden" name="back" value="{{ request.url.path }}?{{ request.url.query }}">
+            <select name="status" aria-label="Change status of {{ i.title }}"
+                    onchange="this.form.submit()">
+              {% for s in statuses %}
+                <option value="{{ s }}" {{ 'selected' if i.status == s }}>{{ status_labels[s] }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+    {% if total %}
+    <tfoot><tr>
+      <th colspan="3">Total shown</th>
+      <th class="num">${{ '%.2f'|format(total) }}</th>
+      <th colspan="3"></th>
+    </tr></tfoot>
+    {% endif %}
+  </table>
+</div>
+{% endif %}
+{% endblock %}

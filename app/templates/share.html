@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Wish list &middot; CardCatalog{% endblock %}
+{% block chrome %}
+<header class="topbar">
+  <div class="topbar-inner">
+    <span class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" aria-hidden="true">
+        <rect x="2" y="5" width="20" height="14" rx="2"/>
+        <path d="M6 10h5M6 14h3"/><circle cx="17" cy="11" r="2"/>
+      </svg>
+      Artist wish list
+    </span>
+    <nav class="nav">
+      <button type="button" id="theme-toggle" title="Switch light / dark theme"
+              aria-label="Switch light or dark theme">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             aria-hidden="true" style="display:block">
+          <circle cx="12" cy="12" r="4.5"/>
+          <path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M19.1 4.9l-1.5 1.5M6.4 17.6l-1.5 1.5"/>
+        </svg>
+      </button>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+{% block body %}
+
+<h1>Wish list</h1>
+<p class="muted">
+  {{ count }} item{{ '' if count == 1 else 's' }} across
+  {{ grouped|length }} artist{{ '' if grouped|length == 1 else 's' }}
+  &middot; ${{ '%.0f'|format(total) }} all in. Read-only.
+</p>
+
+{% if not grouped %}
+  <div class="empty"><h2>Nothing on the list right now</h2></div>
+{% endif %}
+
+{% for key, items in grouped.items() %}
+  {% set aid, artist, handle = key %}
+  <div class="section">
+    <h2 style="margin-bottom:.2rem">{{ artist }}</h2>
+    <p class="muted" style="margin:0 0 .6rem;font-size:.86rem">
+      {% if handle %}@{{ handle }}{% endif %}
+      {% set links = artist_links.get(aid, []) %}
+      {% if links %}
+        {% if handle %} &middot; {% endif %}
+        {% for l in links %}<a href="{{ l.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ l.label or 'link' }}</a>{% if not loop.last %} &middot; {% endif %}{% endfor %}
+      {% endif %}
+    </p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr>
+          <th>Priority</th><th>Item</th><th class="num">Price</th><th>Notes</th>
+        </tr></thead>
+        <tbody>
+        {% for i in items %}
+          <tr>
+            <td><span class="pri pri-{{ i.priority }}">{{ priority_labels.get(i.priority, '') }}</span></td>
+            <td>
+              {% if i.url %}
+                <a href="{{ i.url }}" target="_blank" rel="noopener noreferrer nofollow">{{ i.title }} &#8599;</a>
+              {% else %}{{ i.title }}{% endif %}
+            </td>
+            <td class="num">{{ '$%.2f'|format(i.price) if i.price is not none else '&mdash;'|safe }}</td>
+            <td class="muted">
+              {{ i.notes }}{% if i.notes and i.target_con %} &middot; {% endif %}{{ i.target_con }}
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endfor %}
+{% endblock %}

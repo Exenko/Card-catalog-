@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% set nav = "library" %}
+{% block title %}Library &middot; CardCatalog{% endblock %}
+{% block body %}
+
+<div class="page-head">
+  <div>
+    <h1>Library</h1>
+    <p class="muted" style="margin:.2rem 0 0">
+      {{ artist_count }} artist{{ '' if artist_count == 1 else 's' }} catalogued
+    </p>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="n">{{ artist_count }}</div><div class="k">Artists</div></div>
+  <div class="stat"><div class="n">{{ want_count }}</div><div class="k">Open wants</div></div>
+  <div class="stat"><div class="n">${{ '%.0f'|format(want_total) }}</div><div class="k">Wish list value</div></div>
+</div>
+
+<form class="filters" method="get" action="/">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search name, shop, notes, con"
+         aria-label="Search artists" style="min-width:min(260px, 100%)">
+  <select name="interest" aria-label="Filter by interest level">
+    <option value="">Any interest</option>
+    {% for level, label in interest_labels.items() %}
+      <option value="{{ level }}" {{ 'selected' if interest == level|string }}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <select name="sort" aria-label="Sort order">
+    <option value="name"     {{ 'selected' if sort == 'name' }}>A &ndash; Z</option>
+    <option value="interest" {{ 'selected' if sort == 'interest' }}>Interest first</option>
+    <option value="recent"   {{ 'selected' if sort == 'recent' }}>Recently added</option>
+    <option value="con"      {{ 'selected' if sort == 'con' }}>By convention</option>
+  </select>
+  <select name="view" aria-label="Layout">
+    <option value="grid" {{ 'selected' if view == 'grid' }}>Card grid</option>
+    <option value="list" {{ 'selected' if view == 'list' }}>Table</option>
+  </select>
+  {% if tag %}<input type="hidden" name="tag" value="{{ tag }}">{% endif %}
+  <button class="btn" type="submit">Apply</button>
+  {% if q or tag or interest %}<a class="btn" href="/">Clear</a>{% endif %}
+</form>
+
+{% if tags %}
+<div class="chips" style="margin-bottom:1.1rem">
+  <a class="chip {{ 'on' if not tag }}" href="/?q={{ q }}&amp;interest={{ interest }}&amp;sort={{ sort }}&amp;view={{ view }}">All tags</a>
+  {% for t in tags %}
+    <a class="chip {{ 'on' if tag == t.name }}"
+       href="/?tag={{ t.name|urlencode }}&amp;q={{ q }}&amp;interest={{ interest }}&amp;sort={{ sort }}&amp;view={{ view }}">
+      {{ t.name }}<span class="ct">{{ t.n }}</span>
+    </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if not rows %}
+  <div class="empty">
+    {% if artist_count %}
+      <h2>Nothing matches those filters</h2>
+      <p>Try clearing the search or picking a different tag.</p>
+      <a class="btn" href="/">Show everything</a>
+    {% else %}
+      <h2>No cards yet</h2>
+      <p>Photograph a card to let OCR fill in the details, or bring your spreadsheet over.</p>
+      <div class="row" style="justify-content:center">
+        <a class="btn btn-primary" href="/artists/new">Add your first card</a>
+        <a class="btn" href="/import">Import a CSV</a>
+      </div>
+    {% endif %}
+  </div>
+
+{% elif view == 'list' %}
+  <div class="panel table-scroll">
+    <table>
+      <thead><tr>
+        <th>Artist</th><th>Tags</th><th>Met at</th><th>Interest</th>
+        <th class="num">Wants</th><th class="num">Value</th>
+      </tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td>
+            <a href="/artists/{{ r.a.id }}"><strong>{{ r.a.name }}</strong></a>
+            {% if r.a.handle %}<div class="card-sub">@{{ r.a.handle }}</div>{% endif %}
+          </td>
+          <td><div class="chips">
+            {% for t in r.tags %}<span class="chip">{{ t }}</span>{% endfor %}
+          </div></td>
+          <td class="muted">{{ r.a.met_at or '&mdash;'|safe }}</td>
+          <td><span class="pri pri-{{ r.a.interest }}">{{ interest_labels.get(r.a.interest, '') }}</span></td>
+          <td class="num">{{ r.want_count }}</td>
+          <td class="num">{{ '$%.0f'|format(r.want_total) if r.want_total else '' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% else %}
+  <div class="grid">
+    {% for r in rows %}
+      <article class="card">
+        <a class="card-cover" href="/artists/{{ r.a.id }}"
+           aria-label="Open {{ r.a.name }}">
+          {% if r.a.card_front %}
+            <img src="/uploads/{{ thumb(r.a.card_front) }}" loading="lazy"
+                 alt="Business card for {{ r.a.name }}">
+          {% else %}
+            <span class="placeholder">{{ r.a.name[:2]|upper }}</span>
+          {% endif %}
+          {% if r.want_count %}<span class="badge">{{ r.want_count }} want{{ '' if r.want_count == 1 else 's' }}</span>{% endif %}
+        </a>
+        <div class="card-body">
+          <div class="card-name"><a href="/artists/{{ r.a.id }}">{{ r.a.name }}</a></div>
+          {% if r.a.handle or r.a.shop_name %}
+            <div class="card-sub">
+              {{ ('@' ~ r.a.handle) if r.a.handle }}{% if r.a.handle and r.a.shop_name %} &middot; {% endif %}{{ r.a.shop_name }}
+            </div>
+          {% endif %}
+          {% if r.tags %}
+            <div class="chips">
+              {% for t in r.tags[:4] %}<span class="chip">{{ t }}</span>{% endfor %}
+              {% if r.tags|length > 4 %}<span class="chip">+{{ r.tags|length - 4 }}</span>{% endif %}
+            </div>
+          {% endif %}
+          <div class="card-foot">
+            <span class="pri pri-{{ r.a.interest }}">{{ interest_labels.get(r.a.interest, '') }}</span>
+            {% if r.want_total %}<span>${{ '%.0f'|format(r.want_total) }}</span>{% endif %}
+          </div>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

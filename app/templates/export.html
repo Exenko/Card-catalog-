@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% set nav = "export" %}
+{% block title %}Export &amp; share &middot; CardCatalog{% endblock %}
+{% block body %}
+<h1>Export &amp; share</h1>
+
+<div class="section">
+  <h2>Share a read-only wish list</h2>
+  <p class="muted" style="margin-top:0">
+    Anyone with this link sees your open wants, grouped by artist, with the links
+    &mdash; no sign-in, nothing editable. It only works from networks that can
+    reach this server, so over Tailscale that means people on your tailnet. To hand
+    it to someone outside, use a Tailscale <span class="mono">Funnel</span> or paste
+    a CSV export instead.
+  </p>
+  <div class="share-url">
+    <input type="text" id="share-link" readonly
+           value="{{ request.base_url }}share/{{ share_token }}"
+           aria-label="Read-only share link">
+    <button class="btn" type="button" data-copy="#share-link">Copy</button>
+    <a class="btn" href="/share/{{ share_token }}" target="_blank" rel="noopener">Preview</a>
+  </div>
+  <form method="post" action="/share/rotate" style="margin-top:.75rem"
+        onsubmit="return confirm('Make a new link? The old one stops working immediately.')">
+    <button class="btn btn-sm btn-danger" type="submit">Rotate the link</button>
+  </form>
+</div>
+
+<div class="section">
+  <h2>CSV downloads</h2>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>File</th><th>What&rsquo;s in it</th><th></th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Full sheet</strong></td>
+          <td>One row per wishlist item with all the artist columns repeated &mdash;
+            the shape a spreadsheet wants. Re-importing this file rebuilds the
+            library, so it doubles as your backup.</td>
+          <td><a class="btn btn-sm" href="/export/sheet.csv">Download</a></td>
+        </tr>
+        <tr>
+          <td><strong>Artists</strong></td>
+          <td>One row per artist, with tags and links collapsed into single cells.</td>
+          <td><a class="btn btn-sm" href="/export/artists.csv">Download</a></td>
+        </tr>
+        <tr>
+          <td><strong>Wish list</strong></td>
+          <td>Just the open wants, priority first &mdash; the one to paste into a
+            shared sheet when someone asks what you&rsquo;re after.</td>
+          <td><a class="btn btn-sm" href="/export/wishlist.csv">Download</a></td>
+        </tr>
+        <tr>
+          <td><strong>Generic wishlist</strong></td>
+          <td>Name, URL, price, quantity, notes &mdash; the minimal shape most
+            wishlist sites accept on import.</td>
+          <td><a class="btn btn-sm" href="/export/mywishlist.csv">Download</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    In Google Sheets: <em>File &rarr; Import &rarr; Upload</em>, then choose
+    &ldquo;Replace current sheet&rdquo;. The header row comes through as-is.
+  </div>
+</div>
+
+<div class="section">
+  <h2>Backups</h2>
+  <p class="muted" style="margin-top:0">
+    Everything lives in <span class="mono">data/cardcatalog.db</span> and
+    <span class="mono">data/uploads/</span>. Copy that one folder and you have the
+    whole library, images included.
+  </p>
+</div>
+{% endblock %}
