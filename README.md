@@ -120,34 +120,59 @@ Things the importer handles:
 | `wishlist.csv` | open wants, priority first | pasting into a shared sheet |
 | `mywishlist.csv` | name / URL / price / qty / notes | generic wishlist sites |
 
+## Look and feel
+
+The theme is a reading room: walnut shelves in the dark theme, parchment and
+pale oak in the light one, with a shaft of afternoon sun across the top of the
+page and accents borrowed from what grows outside — **pine** for actions,
+**bluebell** for tags, **new leaf**, **honey**, **rosehip** and **open sky** for
+status.
+
+Nothing is a flat fill. Every surface is a gradient between a lit top stop
+(`-hi`) and a shaded bottom one (`-lo`), and light comes from above
+consistently, so depth means something:
+
+- **Raised** (`--lift-1/2/3`) — cards, buttons, chips, panels, stat tiles. A lit
+  top edge, a dark bottom edge, and a cast shadow that grows on hover.
+- **Recessed** (`--sink`, `--sink-deep`) — inputs, the budget trough, table
+  headers, the OCR dropzone, and the frame a card photo sits in, like a print
+  behind a mat. Buttons swap to recessed while pressed.
+
+Wood grain is a faint repeating gradient on the shelf rail; the card photo gets
+a diagonal sheen like glass catching the light.
+
 ## Colour and accessibility
 
-The interface is built on 15 OKLCH tokens (the 14 semantic roles plus
-`--on-accent` for labels sitting on a filled button). Both themes are *selected*
-rather than algorithmically inverted — the dark steps were solved separately
-against the dark surface.
-
-Every foreground token is solved against the lowest-contrast surface in its own
-theme, so any token is legible on any background in the system:
+35 OKLCH tokens per theme. Because surfaces are gradients, text sits on a
+*range* of colours rather than one, so each surface contributes three samples —
+its base, its `-hi` stop and its `-lo` stop — and every foreground is solved
+against the worst of all twelve. Both themes are selected independently; dark is
+not an inverted light.
 
 | | requirement | light | dark |
 |---|---|---|---|
-| `--text` | AAA body text, ≥ 7:1 | 12.27:1 | 12.32:1 |
+| `--text` | AAA body, ≥ 7:1 | 11.49:1 | 8.93:1 |
 | `--text-muted` | AA, ≥ 4.5:1 | 4.51:1 | 4.51:1 |
-| `--border` | AA non-text, ≥ 3:1 | 3.00:1 | 3.00:1 |
-| accents as text | AA, ≥ 4.5:1 | ≥ 4.60:1 | ≥ 6.50:1 |
-| `--on-accent` on a fill | AA, ≥ 4.5:1 | ≥ 5.91:1 | ≥ 9.44:1 |
+| `--border` | AA non-text, ≥ 3:1 | 3.01:1 | 3.00:1 |
+| accents as text | AA, ≥ 4.5:1 | 4.60:1 | 5.00:1 |
+| `--on-accent` across a fill | AA, ≥ 4.5:1 | 5.29:1 | 8.22:1 |
 
-Re-run the whole matrix after changing any colour — it reads the tokens straight
-out of the stylesheet:
+Those are worst-case numbers across every gradient stop, not midpoints. Re-run
+the whole matrix after changing any colour — it reads the tokens straight out of
+the stylesheet, so it catches drift:
 
 ```bash
 python3 tools/check_contrast.py
 ```
 
-Colour never carries meaning on its own: `--danger` and `--success` are not
+Text itself stays a flat colour: gradient text can't be contrast-checked and
+reads poorly at body sizes.
+
+Colour never carries meaning on its own. `--danger` and `--success` are not
 separable under deuteranopia, so every status chip pairs its colour with a glyph
-and a word, and every priority marker sits beside its label.
+*and* a word, and every priority bead sits beside its label. Depth is decorative
+only — nothing is distinguished by shadow alone. `prefers-reduced-motion`
+disables the hover lifts.
 
 ## Layout
 

@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>{% block title %}CardCatalog{% endblock %}</title>
 <link rel="stylesheet" href="/static/style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>&#128100;</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>&#128218;</text></svg>">
 <script>
   // Apply the saved theme before first paint so there's no flash.
   try {
@@ -20,10 +20,14 @@
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" href="/">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" aria-hidden="true">
-        <rect x="2" y="5" width="20" height="14" rx="2"/>
-        <path d="M6 10h5M6 14h3"/><circle cx="17" cy="11" r="2"/>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 7.4V4.9"/>
+        <path d="M12.1 5.3c.1-1.4 1.3-2.5 2.8-2.5.1 1.4-1.1 2.6-2.8 2.5z"
+              fill="currentColor" stroke="none"/>
+        <path d="M12 8.6c-1-1-2.5-1.6-4.2-1.6H3.4v11.2h4.4c1.7 0 3.2.6 4.2 1.6"/>
+        <path d="M12 8.6c1-1 2.5-1.6 4.2-1.6h4.4v11.2h-4.4c-1.7 0-3.2.6-4.2 1.6"/>
+        <path d="M12 8.6v11.2"/>
       </svg>
       CardCatalog
     </a>

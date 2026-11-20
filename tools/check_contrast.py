@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Verify every colour pair in app/static/style.css against WCAG.
 
-Reads the OKLCH tokens straight out of the stylesheet -- so if you change a
-colour, this tells you whether it still passes. No dependencies.
+Surfaces here are GRADIENTS, so each one contributes three sample colours --
+its base, its lit top stop (-hi) and its shaded bottom stop (-lo). Every
+foreground is checked against ALL of them, because text sitting on a gradient
+has to stay legible across the whole span, not just at the midpoint.
 
     python3 tools/check_contrast.py
 
-Exits non-zero if anything fails, so it works in a pre-commit hook or CI.
+Reads the tokens straight out of the stylesheet, so it catches you if you
+change a colour. Exits non-zero on any failure -- usable in CI or a hook.
 """
 import math
 import os
@@ -22,7 +25,8 @@ M2 = [[ 4.0767416621, -3.3077115913,  0.2309699292],
 
 SURFACES = ["bg-dark", "bg", "bg-light", "highlight"]
 ACCENTS = ["primary", "secondary", "danger", "warning", "success", "info"]
-# token -> (minimum ratio against every surface, why)
+STOPS = ["", "-hi", "-lo"]
+# foreground token -> (minimum ratio against every surface stop, why)
 RULES = {
     "text":       (7.0, "AAA body text"),
     "text-muted": (4.5, "AA secondary text"),
@@ -52,15 +56,11 @@ def contrast(c1, c2):
 
 
 def parse():
-    """Pull the two themes' token blocks out of the stylesheet."""
-    css = open(CSS).read()
-    # Strip comments so hex annotations can't be mistaken for declarations.
-    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    """Pull the light (:root) and dark ([data-theme=dark]) token blocks out."""
+    css = re.sub(r"/\*.*?\*/", "", open(CSS).read(), flags=re.S)
     themes = {}
-    # :root block = light; the [data-theme="dark"] block = dark.
-    blocks = re.findall(r"(:root(?:\[data-theme=\"dark\"\])?)\s*\{(.*?)\n\}",
-                        css, re.S)
-    for selector, body in blocks:
+    for selector, body in re.findall(
+            r"(:root(?:\[data-theme=\"dark\"\])?)\s*\{(.*?)\n\}", css, re.S):
         name = "dark" if "dark" in selector else "light"
         tokens = {}
         for tok, L, C, H in re.findall(
@@ -73,45 +73,59 @@ def parse():
 
 def main():
     themes = parse()
-    if len(themes) < 2:
-        print("Could not read both themes out of style.css", file=sys.stderr)
+    missing_theme = {"light", "dark"} - set(themes)
+    if missing_theme:
+        print(f"Could not read theme(s): {', '.join(missing_theme)}",
+              file=sys.stderr)
         return 2
 
-    failures = 0
-    required = set(SURFACES) | set(ACCENTS) | set(RULES) | {"on-accent"}
+    failures = []
     for theme in ("light", "dark"):
         tokens = themes[theme]
         print(f"\n=== {theme} ===")
-        missing = required - set(tokens)
-        if missing:
-            print(f"  MISSING tokens: {', '.join(sorted(missing))}")
-            failures += len(missing)
+        needed = ({s + st for s in SURFACES for st in STOPS}
+                  | {a + st for a in ACCENTS for st in STOPS}
+                  | set(RULES) | {"on-accent"})
+        absent = sorted(needed - set(tokens))
+        if absent:
+            print(f"  MISSING: {', '.join(absent)}")
+            failures += absent
             continue
-        print(f"  {len(tokens)} tokens defined")
 
-        def check(label, ratio, need):
-            nonlocal failures
+        surface_stops = [(f"{s}{st}", tokens[s + st])
+                         for s in SURFACES for st in STOPS]
+        print(f"  {len(tokens)} tokens, {len(surface_stops)} surface stops")
+
+        def worst(fg):
+            name, ratio = min(((n, contrast(tokens[fg], c))
+                               for n, c in surface_stops), key=lambda x: x[1])
+            return name, ratio
+
+        def report(label, ratio, need, where=""):
             ok = ratio >= need
             if not ok:
-                failures += 1
-            flag = "pass" if ok else "FAIL"
-            print(f"  [{flag}] {label:<42} {ratio:5.2f}:1  (>= {need})")
+                failures.append(f"{theme}: {label}")
+            tail = f"  worst: --{where}" if where else ""
+            print(f"  [{'pass' if ok else 'FAIL'}] {label:<40} "
+                  f"{ratio:5.2f}:1 (>= {need}){tail}")
 
         for tok, (need, why) in RULES.items():
-            worst = min(contrast(tokens[tok], tokens[s]) for s in SURFACES)
-            check(f"--{tok} on worst surface ({why})", worst, need)
+            where, ratio = worst(tok)
+            report(f"--{tok} ({why})", ratio, need, where)
         for tok in ACCENTS:
-            worst = min(contrast(tokens[tok], tokens[s]) for s in SURFACES)
-            check(f"--{tok} as text on worst surface", worst, 4.5)
+            where, ratio = worst(tok)
+            report(f"--{tok} as text", ratio, 4.5, where)
         for tok in ACCENTS:
-            check(f"--on-accent on --{tok} fill",
-                  contrast(tokens["on-accent"], tokens[tok]), 4.5)
+            ratio = min(contrast(tokens["on-accent"], tokens[tok + st])
+                        for st in STOPS)
+            report(f"--on-accent across --{tok} fill", ratio, 4.5)
 
     print()
     if failures:
-        print(f"{failures} check(s) FAILED")
+        print(f"{len(failures)} check(s) FAILED")
         return 1
-    print("All contrast checks passed (WCAG AA, AAA for body text).")
+    print("All contrast checks passed across every gradient stop "
+          "(WCAG AA, AAA for body text).")
     return 0
 
 
