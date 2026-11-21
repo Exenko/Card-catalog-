@@ -15,8 +15,16 @@ Runs on your own machine. Nothing leaves it.
 
 - **Card grid.** The photo of the card is the cover art, so you recognise a booth
   the way you actually remember it.
-- **OCR assist.** Photograph a card and the name, handle, shop, links and some
-  tags are filled in for you to correct. Runs locally — see *Privacy* below.
+- **Both sides, auto-cropped.** Drop a photo of the front and the back. Each one
+  has the card located in the frame, straightened out of whatever angle you shot
+  it at, and cropped away from the tabletop — no manual cropping. If no
+  card-shaped outline is found, the photo is kept whole rather than guessed at,
+  and you can switch auto-crop off entirely.
+- **OCR assist across both sides.** The front usually carries the name, the back
+  the links and email, so the two readings are merged into one suggestion: name
+  from the front, links unioned from both, tags from either. Straightening the
+  card first measurably improves it — a test photo read as `Mariso) Vega` whole
+  and `Marisol Vega` cropped. Runs locally — see *Privacy* below.
 - **Tags.** Free-form and multi-select: `prints`, `acrylic charms`, `jjk`,
   `commissions open`, whatever you like. Rename one and it updates everywhere.
 - **Per-artist wish lists.** One artist can have one item or fifteen, each with
@@ -38,6 +46,10 @@ Then open <http://localhost:8000>.
 
 Everything persists in `./data` — `cardcatalog.db` plus the card images in
 `uploads/`. Copy that one folder and you have the whole library backed up.
+
+The image is around 450MB built, most of it OpenCV and Tesseract. That is the
+cost of doing card detection and text recognition on your own hardware instead
+of sending photos to a service.
 
 ### Reaching it over Tailscale
 
@@ -69,9 +81,12 @@ service. Specifically:
 - **No AI service is involved.** OCR is [Tesseract](https://tesseract-ocr.github.io/),
   an open-source engine that runs as a local binary inside your container. There
   is no model API, no inference endpoint, no account, no telemetry.
+- **No AI in the auto-crop either.** Card detection is classical computer
+  vision in OpenCV — edge detection and contour fitting. No model, no inference,
+  no upload. The OpenCV build links no network or TLS libraries at all.
 - **No HTTP client in the codebase.** The app imports `fastapi`, `pillow`,
-  `pytesseract`, and the Python standard library. Nothing that can make an
-  outbound request.
+  `opencv-python-headless`, `numpy`, `pytesseract`, and the Python standard
+  library. Nothing that can make an outbound request.
 - **No CDN.** All CSS and JavaScript is served from the container. No Google
   Fonts, no script tags pointing at someone else's server, no analytics. The app
   works with the machine fully offline.
@@ -79,12 +94,12 @@ service. Specifically:
   server, gets resized by Pillow and read by Tesseract, and is written to
   `./data/uploads`. That is the whole journey.
 
-You can verify the OCR claim yourself — this runs the real pipeline inside a
-network namespace with no interfaces at all, so it would fail if anything tried
-to phone home:
+You can verify this yourself — the check runs the real pipeline, auto-crop and
+OCR both, inside a network namespace with no interfaces at all, so it would fail
+if anything tried to phone home:
 
 ```bash
-sudo ./tools/check_offline.sh path/to/a-card.jpg
+sudo ./tools/check_offline.sh path/to/a-card-photo.jpg
 ```
 
 Artists' work stays between you and your own disk.
@@ -180,7 +195,8 @@ disables the hover lifts.
 app/
   main.py        routes
   db.py          SQLite schema and helpers -- the whole data model
-  ocr.py         Tesseract pipeline and the card-text parser
+  ocr.py         Tesseract pipeline, card-text parser, front/back merging
+  autocrop.py    finds the card in a photo and straightens it (OpenCV)
   importer.py    CSV column guessing and merge-on-import
   exporter.py    the four CSV shapes
   images.py      upload handling, resizing, thumbnails

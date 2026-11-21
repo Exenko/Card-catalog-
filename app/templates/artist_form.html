@@ -21,16 +21,33 @@
   <div class="section">
     <h2>Scan the card</h2>
     <p class="muted" style="margin-top:0">
-      Drop a photo here and the fields below get filled in for you. Everything stays
-      editable &mdash; OCR on a hand-lettered card is a starting point, not gospel.
+      Drop a photo of each side. The card is found in the photo, straightened and
+      cropped out of the background for you, then read. Most art cards put the
+      name on the front and the links on the back, so scanning both fills in the
+      most. Everything stays editable &mdash; OCR on a hand-lettered card is a
+      starting point, not gospel.
     </p>
-    <label class="drop" id="ocr-drop" for="ocr-input">
-      <strong>Drop a card photo</strong> or tap to choose
-      <div class="small">JPEG, PNG, WebP or HEIC &middot; it also becomes the cover image</div>
-    </label>
-    <input type="file" id="ocr-input" accept="image/*" hidden>
+
+    <div class="scan-grid">
+      <div class="scan-side">
+        <label class="drop" id="drop-front" for="pick-front">
+          <strong>Front</strong>
+          <div class="small">name, shop, the artwork</div>
+        </label>
+        <input type="file" id="pick-front" accept="image/*" hidden>
+        <div class="scan-preview" id="prev-front"></div>
+      </div>
+      <div class="scan-side">
+        <label class="drop" id="drop-back" for="pick-back">
+          <strong>Back</strong>
+          <div class="small">usually links and email</div>
+        </label>
+        <input type="file" id="pick-back" accept="image/*" hidden>
+        <div class="scan-preview" id="prev-back"></div>
+      </div>
+    </div>
+
     <div class="ocr-status" id="ocr-status" role="status" aria-live="polite"></div>
-    <div class="ocr-preview" id="ocr-preview"></div>
     <details class="raw" id="ocr-raw-box" hidden style="margin-top:.6rem">
       <summary>What the scanner actually read</summary>
       <pre id="ocr-raw"></pre>
@@ -121,6 +138,15 @@
 
   <div class="section">
     <h2>Card photos</h2>
+    <label class="row" style="margin:-.3rem 0 .9rem;gap:.45rem;cursor:pointer">
+      <input type="hidden" name="autocrop" value="0">
+      <input type="checkbox" name="autocrop" id="autocrop" value="1" checked
+             style="width:auto;box-shadow:none">
+      <span class="hint" style="font-size:.84rem">
+        Find and straighten the card in the photo, and crop the background away.
+        If no card-shaped outline is found, the photo is kept whole.
+      </span>
+    </label>
     <div class="form-grid">
       <div class="field">
         <label for="card-front-input">Front</label>

@@ -118,6 +118,19 @@ def _int_or(value, default):
         return default
 
 
+def _wants_autocrop(form):
+    """True unless the form explicitly turned auto-crop off.
+
+    A cleared checkbox posts nothing, so the template pairs it with a hidden
+    "0"; presence of the checkbox's own "1" is what counts. Callers that send
+    no autocrop field at all (the API, older clients) get the default: on.
+    """
+    values = form.getlist("autocrop")
+    if not values:
+        return True
+    return "1" in values
+
+
 def _price_or_none(value):
     value = (value or "").strip().replace("$", "").replace(",", "")
     if not value:
@@ -188,10 +201,14 @@ async def artist_create(request: Request):
     if not name:
         return RedirectResponse("/artists/new?error=name", status_code=303)
 
+    auto_crop = _wants_autocrop(form)
     front = form.get("card_front")
     back = form.get("card_back")
-    front_name = images.save_card_image(await front.read()) if hasattr(front, "read") else ""
-    back_name = images.save_card_image(await back.read()) if hasattr(back, "read") else ""
+    front_name = back_name = ""
+    if hasattr(front, "read"):
+        front_name, _ = images.save_card_image(await front.read(), auto_crop)
+    if hasattr(back, "read"):
+        back_name, _ = images.save_card_image(await back.read(), auto_crop)
 
     with db.db() as conn:
         cur = conn.execute(
@@ -222,11 +239,12 @@ async def artist_update(request: Request, artist_id: int):
         if not a:
             raise HTTPException(404, "No such artist")
 
+        auto_crop = _wants_autocrop(form)
         front_name, back_name = a["card_front"], a["card_back"]
         for field, current in (("card_front", front_name), ("card_back", back_name)):
             upload = form.get(field)
             if hasattr(upload, "read"):
-                saved = images.save_card_image(await upload.read())
+                saved, _ = images.save_card_image(await upload.read(), auto_crop)
                 if saved:
                     images.delete_card_image(current)
                     if field == "card_front":
@@ -398,13 +416,52 @@ def tag_delete(tag_id: int):
 # ---------------------------------------------------------------- OCR
 
 @app.post("/ocr")
-async def ocr_endpoint(card: UploadFile = File(...)):
-    raw = await card.read()
-    if not raw:
-        return JSONResponse({"error": "empty upload"}, status_code=400)
-    if len(raw) > 25 * 1024 * 1024:
-        return JSONResponse({"error": "image too large (25MB max)"}, status_code=413)
-    return JSONResponse(ocr.read_card(raw))
+async def ocr_endpoint(request: Request):
+    """Read one or both sides of a card and return a single merged suggestion.
+
+    Each side is auto-cropped first (which markedly improves the reading), and
+    the response carries a preview of each crop so the browser can show what
+    will actually be saved.
+    """
+    form = await request.form()
+    auto_crop = _wants_autocrop(form)
+
+    uploads = {}
+    for side in ("front", "back"):
+        up = form.get(side)
+        if hasattr(up, "read"):
+            uploads[side] = up
+    # Older single-field callers posted the image as `card`.
+    if not uploads and hasattr(form.get("card"), "read"):
+        uploads["front"] = form.get("card")
+    if not uploads:
+        return JSONResponse({"error": "no image supplied"}, status_code=400)
+
+    readings, sides = {}, {}
+    for side, up in uploads.items():
+        raw = await up.read()
+        if not raw:
+            continue
+        if len(raw) > 25 * 1024 * 1024:
+            sides[side] = {"error": "image too large (25MB max)"}
+            continue
+        img, cropped = images.prepare(raw, auto_crop)
+        if img is None:
+            sides[side] = {"error": "could not read that image"}
+            continue
+        readings[side] = ocr.read_card(images.encode_jpeg(img))
+        sides[side] = {
+            "cropped": cropped,
+            "preview": images.preview_data_url(img),
+        }
+
+    merged = ocr.merge_sides(readings.get("front"), readings.get("back"))
+    if merged is None:
+        return JSONResponse({"error": "no readable image", "sides": sides},
+                            status_code=400)
+    merged["sides"] = sides
+    merged["ocr_available"] = ocr.OCR_AVAILABLE
+    return JSONResponse(merged)
 
 
 # ---------------------------------------------------------------- import

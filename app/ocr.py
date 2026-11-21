@@ -241,3 +241,54 @@ def read_card(image_bytes):
     result = parse_card(text)
     result["ocr_available"] = OCR_AVAILABLE
     return result
+
+
+def merge_sides(front, back):
+    """Combine the readings from both sides of one card.
+
+    The front of an art card usually carries the name; the back carries the
+    links, the shop and the email. Either may be missing, so take the first
+    confident value for the single-valued fields and union the rest.
+    """
+    sides = [s for s in (front, back) if s]
+    if not sides:
+        return None
+    if len(sides) == 1:
+        return dict(sides[0])
+
+    merged = dict(sides[0])
+    for field in ("name", "handle", "shop_name", "email"):
+        for s in sides:
+            if s.get(field):
+                merged[field] = s[field]
+                break
+        else:
+            merged[field] = ""
+
+    # A name is a person; a bare handle on the back shouldn't beat the front's.
+    if front and front.get("name"):
+        merged["name"] = front["name"]
+
+    seen, links = set(), []
+    for s in sides:
+        for link in s.get("links", []):
+            key = link["url"].rstrip("/").lower()
+            if key not in seen:
+                seen.add(key)
+                links.append(link)
+    merged["links"] = links
+
+    for field in ("tags", "emails", "handles", "phones"):
+        out, seen_v = [], set()
+        for s in sides:
+            for v in s.get(field, []):
+                if v.lower() not in seen_v:
+                    seen_v.add(v.lower())
+                    out.append(v)
+        merged[field] = out
+
+    merged["raw_text"] = "\n\n".join(
+        f"--- {label} ---\n{s['raw_text']}"
+        for label, s in (("front", front), ("back", back))
+        if s and s.get("raw_text")).strip()
+    return merged

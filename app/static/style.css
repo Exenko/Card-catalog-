@@ -534,6 +534,27 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .card:hover, .btn:hover, a.chip:hover { transform: none; }
 }
 
+/* ---------- two-sided scan ---------- */
+.scan-grid { display: grid; gap: .9rem;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+.scan-side { display: flex; flex-direction: column; gap: .5rem; }
+.scan-preview:empty { display: none; }
+.scan-preview { position: relative; border-radius: var(--radius-sm);
+  overflow: hidden; border: 1px solid var(--border-muted);
+  box-shadow: var(--lift-1); }
+.scan-preview img { display: block; width: 100%; height: auto; }
+.scan-preview .tag {
+  position: absolute; left: .4rem; bottom: .4rem;
+  font-size: .7rem; font-weight: 650; padding: .14rem .45rem;
+  border-radius: 999px; border: 1px solid var(--primary-lo);
+  background: linear-gradient(180deg, var(--primary-hi), var(--primary-lo));
+  color: var(--on-accent);
+}
+.scan-preview .tag.plain {
+  background: linear-gradient(180deg, var(--bg-light-hi), var(--bg-light-lo));
+  color: var(--text-muted); border-color: var(--border-muted);
+}
+
 /* ---------- misc ---------- */
 .empty { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
 .empty h2 { color: var(--text); }
